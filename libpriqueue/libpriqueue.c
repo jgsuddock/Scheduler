@@ -132,22 +132,30 @@ void *priqueue_at(priqueue_t *q, int index)
  */
 int priqueue_remove(priqueue_t *q, void *ptr)
 {
-	/////////////////////////// THIS SECTION NEEDS WORK ///////////////////////
-	int entriesRemoved = 0;
-	struct listnode_t *temp = q->front;
-	for(temp = q->front; temp != NULL; temp = temp->next) {
-		if(temp->value == ptr) {
-			if(temp == q->front) {
-				struct listnode_t *remove = temp;
-				temp = temp->next;
-				q->front = temp;
-			}
-			else {
-				struct listnode_t *remove = temp;
+	if(q->size == 0) {
+		return 0;
+	}
+	else {
+		int entriesRemoved = 0;
+		while(q->front->value == ptr) {
+			struct listnode_t *remove = q->front;
+			q->front = q->front->next;
+			free(remove);
+			entriesRemoved++;
+			q->size--;
+		}
+		struct listnode_t *temp;
+		for(temp = q->front; temp->next != NULL; temp = temp->next) {
+			if(temp->next->value == ptr) {
+				struct listnode_t *remove = temp->next;
+				temp->next = temp->next->next;
+				free(remove);
+				entriesRemoved++;
+				q->size--;
 			}
 		}
+		return entriesRemoved;
 	}
-	return 0;
 }
 
 
@@ -162,7 +170,38 @@ int priqueue_remove(priqueue_t *q, void *ptr)
  */
 void *priqueue_remove_at(priqueue_t *q, int index)
 {
-	return 0;
+	if(q->size == 0) {
+		return NULL;
+	}
+	else {
+		if(index == 0){
+			void *value = q->front->value;
+			struct listnode_t *remove = q->front;
+			q->front = q->front->next;
+			free(remove);
+			q->size--;
+			return value;
+		}
+		else {
+			int i;
+			struct listnode_t *temp = q->front;
+			for(i = 0; i < index - 1 && temp->next != NULL; i++) {
+				temp = temp->next;
+			}
+			if(temp->next != NULL) {
+				void *value = temp->next->value;
+				struct listnode_t *remove = temp->next;
+				temp->next = temp->next->next;
+				free(remove);
+				q->size--;
+				return value;
+			}
+			else {
+				return NULL;
+			}
+		}
+	}
+	return NULL;
 }
 
 
@@ -174,7 +213,7 @@ void *priqueue_remove_at(priqueue_t *q, int index)
  */
 int priqueue_size(priqueue_t *q)
 {
-	return 0;
+	return q->size;
 }
 
 
@@ -185,5 +224,11 @@ int priqueue_size(priqueue_t *q)
  */
 void priqueue_destroy(priqueue_t *q)
 {
-
+	int i;
+	for(i = 0; i < q->size; i++) {
+		struct listnode_t *remove = q->front;
+		q->front = q->front->next;
+		free(remove);
+	}
+	q->size = 0;
 }
