@@ -12,7 +12,7 @@
 typedef struct _listnode_t
 {
 	void *value;
-	struct listnode_t *next;
+	struct _listnode_t *next;
 } listnode_t;
 
 /**
@@ -25,7 +25,7 @@ typedef struct _priqueue_t
 	//>0 The element pointed by p1 goes after the element pointed by p2
 	int(*comparer)(const void *, const void *);
 	int size;
-	struct listnode_t *front;
+	struct _listnode_t *front;
 } priqueue_t;
 
 
