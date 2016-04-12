@@ -34,45 +34,33 @@ void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
  */
 int priqueue_offer(priqueue_t *q, void *ptr)
 {
-	printf("Hit 1\n");
 	listnode_t *node = (listnode_t *)malloc(sizeof(listnode_t));
 	node->value = ptr;
-	printf("Hit 2\n");
+	node->next = NULL;
+	q->size++;
 
 	int saveindex = -1;
 	if(q->front == NULL) { //Array is empty
-		printf("Hit 3\n");
 		q->front = node;
-		q->size++;
 		saveindex = 0;
 	}
 	else { // Array is not empty
-		printf("Hit 4\n");
-		//
 		if(q->comparer(ptr, q->front->value) < 0) {
-			printf("Hit 5\n");
 			node->next = q->front;
 			q->front = node;
-			q->size++;
 			saveindex = 0;
 		}
 		else {
-			printf("Hit 6\n");
 			listnode_t *tempptr = q->front;
 			saveindex = 1;
-			while(tempptr->next != NULL && q->comparer(ptr, tempptr->next->value) >= 0) { /////////////////////////// Error with value of tempptr->next
-				printf("%p(%p) ",tempptr,tempptr->value);
+			while(tempptr->next != NULL && q->comparer(ptr, tempptr->next->value) >= 0) {
 				tempptr = tempptr->next;
-				printf("=> %p(%p)\n",tempptr,tempptr->value);
 				saveindex++;
 			}
-			printf("Hit 7\n");
 			node->next = tempptr->next;
 			tempptr->next = node;
-			q->size++;
 		}
 	}
-	printf("Hit 8\n");
 	return (saveindex);
 }
 
@@ -106,7 +94,7 @@ void *priqueue_peek(priqueue_t *q)
  */
 void *priqueue_poll(priqueue_t *q)
 {
-	if(q->size == 0) {
+	if(q->front == NULL) {
 		return NULL;
 	}
 	else {
@@ -224,29 +212,6 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 	}
 	return NULL;
 }
-
-/**
-  Returns the pointer to the element in the queue that is equivilant
-  to the input element.
-
-  @param q a pointer to an instance of the priqueue_t data structure
-  @param element a value to compare to each element in the queue
-  @param compare a compare function to used to compare the input 
-  element to the element in the queue
-  @return a pointer to the element if equivalent to the input
-  element. Otherwise returns NULL if not found
- */
-void *priqueue_search(priqueue_t *q, void *element, int(*compare)(const void *, const void *)) {
-	listnode_t *temp = q->front;
-	while(temp != NULL) {
-		if(compare(element, temp->value) == 0) {
-			return temp->value;
-		}
-		temp = temp->next;
-	}
-	return NULL;
-}
-
 
 /**
   Returns the number of elements in the queue.

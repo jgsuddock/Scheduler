@@ -43,16 +43,6 @@ scheduler_t* scheduler;
  *     >0 a goes after b
  */
 
-void printqueue() {
-	printf("**************Printing Queue:***************\n");
-	int i;
-	for(i = 0; i < priqueue_size(&scheduler->job_queue); i++) {
-		job_t* temp = priqueue_at(&scheduler->job_queue, i);
-		printf(" %p",temp);
-	}
-	printf("\nEnd Printing Queue\n");
-}
-
 // Place new element at end of queue
 int compare_fcfs(const void * a, const void * b) 
 {
@@ -185,7 +175,7 @@ void scheduler_start_up(int cores, scheme_t scheme)
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
-	job_t* job = (job_t *)malloc(sizeof(job_t));
+	job_t* job = malloc(sizeof(job_t));
 	job->id = job_number;
 	job->arrival_time = time;
 	job->running_time = running_time;
@@ -252,7 +242,9 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 	scheduler->total_finished_jobs++;
 	job_t* oldjob = scheduler->core_array[core_id];
 	scheduler->total_wait_time += (time - oldjob->arrival_time - oldjob->running_time);
-	scheduler->total_response_time += (time - oldjob->arrival_time);
+	scheduler->total_turnaround_time += (time - oldjob->arrival_time);
+
+	free(oldjob);
 
 	job_t* job = priqueue_poll(&scheduler->job_queue);
 
@@ -262,7 +254,7 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 	}
 	
 	if(job->remaining_time == job->running_time) {
-		scheduler->total_turnaround_time += (time - job->arrival_time);
+		scheduler->total_response_time += (time - job->arrival_time);
 	}
 	scheduler->core_array[core_id] = job;
 	return job->id;
@@ -307,7 +299,10 @@ int scheduler_quantum_expired(int core_id, int time)
  */
 float scheduler_average_waiting_time()
 {
-	return 0.0;
+	if(scheduler->total_finished_jobs == 0) {
+		return 0.0;
+	}
+	return (float) scheduler->total_wait_time / (float) scheduler->total_finished_jobs;
 }
 
 
@@ -320,7 +315,10 @@ float scheduler_average_waiting_time()
  */
 float scheduler_average_turnaround_time()
 {
-	return 0.0;
+	if(scheduler->total_finished_jobs == 0) {
+		return 0.0;
+	}
+	return (float) scheduler->total_turnaround_time / (float) scheduler->total_finished_jobs;
 }
 
 
@@ -333,7 +331,10 @@ float scheduler_average_turnaround_time()
  */
 float scheduler_average_response_time()
 {
-	return 0.0;
+	if(scheduler->total_finished_jobs == 0) {
+		return 0.0;
+	}
+	return (float) scheduler->total_response_time / (float) scheduler->total_finished_jobs;
 }
 
 
