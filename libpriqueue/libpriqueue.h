@@ -37,8 +37,10 @@ void * priqueue_poll     (priqueue_t *q);
 void * priqueue_at       (priqueue_t *q, int index);
 int    priqueue_remove   (priqueue_t *q, void *ptr);
 void * priqueue_remove_at(priqueue_t *q, int index);
+void * priqueue_search   (priqueue_t *q, void *element, int(*compare)(const void *, const void *));
 int    priqueue_size     (priqueue_t *q);
 
 void   priqueue_destroy  (priqueue_t *q);
 
 #endif /* LIBPQUEUE_H_ */
+

@@ -34,37 +34,46 @@ void priqueue_init(priqueue_t *q, int(*comparer)(const void *, const void *))
  */
 int priqueue_offer(priqueue_t *q, void *ptr)
 {
-	struct _listnode_t *node = (struct _listnode_t*)malloc(sizeof(struct _listnode_t));
+	printf("Hit 1\n");
+	listnode_t *node = (listnode_t *)malloc(sizeof(listnode_t));
 	node->value = ptr;
+	printf("Hit 2\n");
 
 	int saveindex = -1;
 	if(q->front == NULL) { //Array is empty
+		printf("Hit 3\n");
 		q->front = node;
 		q->size++;
 		saveindex = 0;
 	}
 	else { // Array is not empty
+		printf("Hit 4\n");
 		//
 		if(q->comparer(ptr, q->front->value) < 0) {
+			printf("Hit 5\n");
 			node->next = q->front;
 			q->front = node;
 			q->size++;
 			saveindex = 0;
 		}
 		else {
-			struct _listnode_t *tempptr = q->front;
-			// Walks down queue to find save location
+			printf("Hit 6\n");
+			listnode_t *tempptr = q->front;
 			saveindex = 1;
-			while(tempptr->next != NULL && q->comparer(ptr, tempptr->next->value) >= 0) {
+			while(tempptr->next != NULL && q->comparer(ptr, tempptr->next->value) >= 0) { /////////////////////////// Error with value of tempptr->next
+				printf("%p(%p) ",tempptr,tempptr->value);
 				tempptr = tempptr->next;
+				printf("=> %p(%p)\n",tempptr,tempptr->value);
 				saveindex++;
 			}
+			printf("Hit 7\n");
 			node->next = tempptr->next;
 			tempptr->next = node;
 			q->size++;
 		}
 	}
-	return (q->size - 1);
+	printf("Hit 8\n");
+	return (saveindex);
 }
 
 
@@ -102,7 +111,7 @@ void *priqueue_poll(priqueue_t *q)
 	}
 	else {
 		void* value = q->front->value;
-		struct _listnode_t* temp = q->front;
+		listnode_t* temp = q->front;
 		q->front = q->front->next;
 		free(temp);
 		q->size--;
@@ -122,7 +131,7 @@ void *priqueue_poll(priqueue_t *q)
  */
 void *priqueue_at(priqueue_t *q, int index)
 {
-	struct _listnode_t *temp;
+	listnode_t *temp;
 	temp = q->front;
 	int i = 0;
 	while(i < index && temp != NULL) {
@@ -150,16 +159,16 @@ int priqueue_remove(priqueue_t *q, void *ptr)
 	else {
 		int entriesRemoved = 0;
 		while(q->front->value == ptr) {
-			struct _listnode_t *remove = q->front;
+			listnode_t *remove = q->front;
 			q->front = q->front->next;
 			free(remove);
 			entriesRemoved++;
 			q->size--;
 		}
-		struct _listnode_t *temp;
+		listnode_t *temp;
 		for(temp = q->front; temp->next != NULL; temp = temp->next) {
 			if(temp->next->value == ptr) {
-				struct _listnode_t *remove = temp->next;
+				listnode_t *remove = temp->next;
 				temp->next = temp->next->next;
 				free(remove);
 				entriesRemoved++;
@@ -188,7 +197,7 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 	else {
 		if(index == 0){
 			void *value = q->front->value;
-			struct _listnode_t *remove = q->front;
+			listnode_t *remove = q->front;
 			q->front = q->front->next;
 			free(remove);
 			q->size--;
@@ -196,13 +205,13 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 		}
 		else {
 			int i;
-			struct _listnode_t *temp = q->front;
+			listnode_t *temp = q->front;
 			for(i = 0; i < index - 1 && temp->next != NULL; i++) {
 				temp = temp->next;
 			}
 			if(temp->next != NULL) {
 				void *value = temp->next->value;
-				struct _listnode_t *remove = temp->next;
+				listnode_t *remove = temp->next;
 				temp->next = temp->next->next;
 				free(remove);
 				q->size--;
@@ -212,6 +221,28 @@ void *priqueue_remove_at(priqueue_t *q, int index)
 				return NULL;
 			}
 		}
+	}
+	return NULL;
+}
+
+/**
+  Returns the pointer to the element in the queue that is equivilant
+  to the input element.
+
+  @param q a pointer to an instance of the priqueue_t data structure
+  @param element a value to compare to each element in the queue
+  @param compare a compare function to used to compare the input 
+  element to the element in the queue
+  @return a pointer to the element if equivalent to the input
+  element. Otherwise returns NULL if not found
+ */
+void *priqueue_search(priqueue_t *q, void *element, int(*compare)(const void *, const void *)) {
+	listnode_t *temp = q->front;
+	while(temp != NULL) {
+		if(compare(element, temp->value) == 0) {
+			return temp->value;
+		}
+		temp = temp->next;
 	}
 	return NULL;
 }
@@ -238,7 +269,7 @@ void priqueue_destroy(priqueue_t *q)
 {
 	int i;
 	for(i = 0; i < q->size; i++) {
-		struct _listnode_t *remove = q->front;
+		listnode_t *remove = q->front;
 		q->front = q->front->next;
 		free(remove);
 	}
