@@ -10,18 +10,20 @@
 
 /**
   Stores information making up a job to be scheduled including any statistics.
-
-  You may need to define some global variables or a struct to store your job queue elements. 
 */
 typedef struct _job_t
 {
 	int id;
-	int arrival_time;
-	int running_time;
-	int remaining_time;
+	int arrival_time; // Time job arrived in the queue
+	int running_time; // Total time it will take the job to complete
+	int remaining_time; // Time left it will take the job to complete
+	int start_in_core_time; // Time last added to a core (for calculating remaining time)
 	int priority;
 } job_t;
 
+/**
+  Stores information making up the scheduler including statistics, core info, and the job queue.
+*/
 typedef struct _scheduler_t
 {
 	int numofcores;
@@ -36,12 +38,9 @@ typedef struct _scheduler_t
 
 scheduler_t* scheduler;
 
-/*
- * Comparator return value meaning:
- *     <0 a goes before b
- *     =0 a is equivalent to b
- *     >0 a goes after b
- */
+/**
+  Compare functions for each scheme.
+*/
 
 // Place new element at end of queue
 int compare_fcfs(const void * a, const void * b) 
@@ -90,6 +89,12 @@ int compare_pri(const void * a, const void * b)
 	}
 	return temp;
 }
+/*
+ * Comparator return value meaning:
+ *     <0 a goes before b
+ *     =0 a is equivalent to b
+ *     >0 a goes after b
+ */
 
 /**
   Initalizes the scheduler.
@@ -105,21 +110,24 @@ int compare_pri(const void * a, const void * b)
 */
 void scheduler_start_up(int cores, scheme_t scheme)
 {
-
+	// Initialize scheduler
 	scheduler = (scheduler_t *)malloc(sizeof(scheduler_t));
 	scheduler->numofcores = cores;
 	scheduler->core_array = (job_t **)malloc(cores * sizeof(job_t *));
 
+	// Initialize scheduler statistics
 	scheduler->total_wait_time = 0;
 	scheduler->total_response_time = 0;
 	scheduler->total_turnaround_time = 0;
 	scheduler->total_finished_jobs = 0;
 
+	// Initialize cores to NULL
 	int i;
 	for(i = 0; i < cores; i++) {
 		scheduler->core_array[i] = NULL;
 	}
 
+	// Initialize scheme and queue using correct comparator function
 	scheduler->scheme = scheme;
 
 	switch(scheme) {
@@ -175,45 +183,85 @@ void scheduler_start_up(int cores, scheme_t scheme)
  */
 int scheduler_new_job(int job_number, int time, int running_time, int priority)
 {
+	// Initializes new job
 	job_t* job = malloc(sizeof(job_t));
 	job->id = job_number;
 	job->arrival_time = time;
 	job->running_time = running_time;
 	job->remaining_time = running_time;
+	job->start_in_core_time = 0;
 	job->priority = priority;
 
+	// Values used for determining which function will get preempted next (if
+	// enabled)
 	int maxPriority = -1;
 	int maxPIndex = -1;
+	int maxPID = -1;
 	int maxRemainingTime = -1;
 	int maxRTIndex = -1;
+	int maxRTID = -1;
+
+	// Runs through each core, if NULL, then places job there. Otherwise
+	// determines if it should preempt one by finding the job currently in a
+	// core with the greates priority or remaining time and compares that to
+	// job priority or remaining time
 	int i;
 	for(i = 0; i < scheduler->numofcores; i++) {
+		// Check for idle core
 		if(scheduler->core_array[i] == NULL) {
 			scheduler->core_array[i] = job;
+			job->start_in_core_time = time;
 			return i;
 		}
-		if (scheduler->core_array[i]->priority > maxPriority) {
+		// Finds max priority with greatest ID of current cores
+		if (scheduler->core_array[i]->priority > maxPriority || 
+				(scheduler->core_array[i]->priority == maxPriority &&
+				scheduler->core_array[i]->id > maxPID)) {
 			maxPriority = scheduler->core_array[i]->priority;
 			maxPIndex = i;
+			maxPID = scheduler->core_array[i]->id;
 		}
-		if (scheduler->core_array[i]->remaining_time > maxRemainingTime) {
-			maxRemainingTime = scheduler->core_array[i]->remaining_time;
+		// Finds max remaining time with greatest ID of current cores
+		int tempTime = scheduler->core_array[i]->remaining_time - (time - scheduler->core_array[i]->start_in_core_time);
+		if (tempTime > maxRemainingTime || (tempTime == maxRemainingTime &&
+					scheduler->core_array[i]->id > maxRTID)) {
+			maxRemainingTime = tempTime;
 			maxRTIndex = i;
+			maxRTID = scheduler->core_array[i]->id;
 		}
 	}
 	
 	// If Preemptive PRI and smaller priority than max priority currently
 	// running in the cores;
 	if(scheduler->scheme == PPRI && job->priority < maxPriority) {
-		priqueue_offer(&scheduler->job_queue, scheduler->core_array[maxPIndex]);
+		job_t* oldjob = scheduler->core_array[maxPIndex];
+		oldjob->remaining_time -= (time - oldjob->start_in_core_time);
+		// If preempted in same cycle as it was added, this will fix the
+		// total response time error (double counting)
+		if(oldjob->remaining_time == oldjob->running_time) {
+			scheduler->total_response_time -= (time - oldjob->arrival_time);
+		}
+		priqueue_offer(&scheduler->job_queue, oldjob);
+
 		scheduler->core_array[maxPIndex] = job;
+		job->start_in_core_time = time;
 		return maxPIndex;
 	}
 	// If Preemptive SJF and smaller remaining time than max remaining
 	// time currently running in the cores;
 	if(scheduler->scheme == PSJF && job->remaining_time < maxRemainingTime) {
-		priqueue_offer(&scheduler->job_queue, scheduler->core_array[maxRTIndex]);
+		// Pulls old job and moves it to queue
+		job_t* oldjob = scheduler->core_array[maxRTIndex];
+		oldjob->remaining_time -= (time - oldjob->start_in_core_time);
+		// If preempted in same cycle as it was added, this will fix the
+		// total response time error (double counting)
+		if(oldjob->remaining_time == oldjob->running_time) {
+			scheduler->total_response_time -= (time - oldjob->arrival_time);
+		}
+		priqueue_offer(&scheduler->job_queue, oldjob);
+
 		scheduler->core_array[maxRTIndex] = job;
+		job->start_in_core_time = time;
 		return maxRTIndex;
 	}
 
@@ -248,15 +296,18 @@ int scheduler_job_finished(int core_id, int job_number, int time)
 
 	job_t* job = priqueue_poll(&scheduler->job_queue);
 
+	// Queue is empty
 	if(job == NULL) {
 		scheduler->core_array[core_id] = NULL;
 		return -1;
 	}
-	
+
+	// If job is new, it updates the remaining time
 	if(job->remaining_time == job->running_time) {
 		scheduler->total_response_time += (time - job->arrival_time);
 	}
 	scheduler->core_array[core_id] = job;
+	job->start_in_core_time = time;
 	return job->id;
 }
 
@@ -278,14 +329,24 @@ int scheduler_quantum_expired(int core_id, int time)
 {
 	job_t* oldjob = scheduler->core_array[core_id];
 
+	oldjob->remaining_time -= (time - oldjob->start_in_core_time);
+
 	priqueue_offer(&scheduler->job_queue, oldjob);
 
 	job_t* newjob = priqueue_poll(&scheduler->job_queue);
 	
-	scheduler->core_array[core_id] = newjob;
+	// Queue is empty (This should never be true
 	if(newjob == NULL) {
 		return -1;
 	}
+
+	// If job is new, it updates the remaining time
+	if(newjob->remaining_time == newjob->running_time) {
+		scheduler->total_response_time += (time - newjob->arrival_time);
+	}
+	scheduler->core_array[core_id] = newjob;
+	newjob->start_in_core_time = time;
+
 	return newjob->id;
 }
 
@@ -346,7 +407,15 @@ float scheduler_average_response_time()
 */
 void scheduler_clean_up()
 {
+	priqueue_destroy(&scheduler->job_queue);
 
+	int i;
+	for(i = 0; i < scheduler->numofcores; i++) {
+		scheduler->core_array[i] = NULL;
+	}
+
+	free(scheduler->core_array);
+	free(scheduler);
 }
 
 
